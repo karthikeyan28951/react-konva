@@ -1,21 +1,19 @@
 import { useState, useRef, useEffect } from "react";
-import { Stage, Layer, Image, Transformer } from "react-konva";
+import { Stage, Layer, Image, Rect, Transformer, Group } from "react-konva";
 
 const CanvasAppWithUserDimensionsAndZoom = () => {
   const FIXED_WIDTH = 800;
   const FIXED_HEIGHT = 600;
 
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
-  console.log('dimensions', dimensions)
   const [isCanvasReady, setCanvasReady] = useState(false);
-  const [images, setImages] = useState([]);
-  const [selectedImageId, setSelectedImageId] = useState(null);
+  const [rectangles, setRectangles] = useState([]);
+  const [selectedRectangleId, setSelectedRectangleId] = useState(null);
   const [scale, setScale] = useState(1);
-  console.log('scale', scale)
   const fileInputRef = useRef(null);
   const transformerRef = useRef(null);
 
-  // Adjust zoom level automatically when dimensions exceed the fixed container
+  // Adjust zoom level when dimensions exceed the fixed container
   useEffect(() => {
     const { width, height } = dimensions;
     if (width > FIXED_WIDTH || height > FIXED_HEIGHT) {
@@ -23,79 +21,74 @@ const CanvasAppWithUserDimensionsAndZoom = () => {
       const scaleHeight = FIXED_HEIGHT / height;
       setScale(Math.min(scaleWidth, scaleHeight));
     } else {
-      setScale(1); // Reset scale if dimensions fit within the container
+      setScale(1);
     }
   }, [dimensions]);
 
-  // Handle dimension input changes
+  // Handle canvas dimensions input
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setDimensions({ ...dimensions, [name]: parseInt(value, 10) || 0 });
   };
 
-  // Create canvas with user dimensions
+  // Create canvas with user-defined dimensions
   const handleCreateCanvas = (e) => {
     e.preventDefault();
     setCanvasReady(true);
   };
 
-  // Handle zoom in/out manually
-  const handleZoom = (zoomFactor) => {
-    const newScale = Math.max(0.5, Math.min(3, scale + zoomFactor)); // Limit zoom range between 0.5x and 3x
-    setScale(newScale);
+  // Add a rectangle to the canvas
+  const handleAddRectangle = () => {
+    const id = `rect-${Date.now()}`;
+    setRectangles((prev) => [
+      ...prev,
+      { id, x: 100, y: 100, width: 200, height: 150, fill: "lightblue", image: null },
+    ]);
   };
 
-  // Handle image upload
-  const handleImageUpload = (e) => {
-    const files = Array.from(e.target.files);
-    files.forEach((file, index) => {
-      const id = `${file.name}-${Date.now()}-${index}`;
-      const reader = new FileReader();
-      const img = new window.Image();
-      img.onload = () => {
-        setImages((prev) => [
-          ...prev,
-          { id, image: img, x: 50, y: 50, scaleX: 1, scaleY: 1 },
-        ]);
-      };
-      reader.onload = () => {
-        img.src = reader.result;
-      };
-      reader.readAsDataURL(file);
-    });
-  };
-
-  // Remove an image
-  const handleRemoveImage = (id) => {
-    setImages((prev) => prev.filter((img) => img.id !== id));
-    if (selectedImageId === id) {
-      setSelectedImageId(null);
-    }
-  };
-
-  // Resize the image dynamically
-  const handleTransformEnd = (id) => {
-    const node = transformerRef.current.getNode();
-    setImages((prev) =>
-      prev.map((img) =>
-        img.id === id
-          ? { ...img, x: node.x(), y: node.y(), scaleX: node.scaleX(), scaleY: node.scaleY() }
-          : img
+  // Handle rectangle drag and resize
+  const handleRectangleTransformEnd = (id, e) => {
+    const node = e.target;
+    const { x, y } = node.position();
+    const { width, height } = node.size();
+    setRectangles((prev) =>
+      prev.map((rect) =>
+        rect.id === id ? { ...rect, x, y, width, height } : rect
       )
     );
   };
 
-  // Attach transformer for resizing
-  const attachTransformer = (id) => {
-    setSelectedImageId(id);
-    const node = images.find((img) => img.id === id);
-    transformerRef.current.nodes([node?.imageRef]);
-    transformerRef.current.getLayer().batchDraw();
+  // Handle rectangle selection
+  const handleSelectRectangle = (id) => {
+    setSelectedRectangleId(id);
+  };
+
+  // Handle image upload inside a selected rectangle
+  const handleImageUpload = (e) => {
+    if (!selectedRectangleId) {
+      alert("Please select a rectangle to upload an image.");
+      return;
+    }
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    const img = new window.Image();
+    img.onload = () => {
+      setRectangles((prev) =>
+        prev.map((rect) =>
+          rect.id === selectedRectangleId ? { ...rect, image: img } : rect
+        )
+      );
+    };
+    reader.onload = () => {
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
   };
 
   return (
     <div style={{ overflow: "hidden" }}>
-      {/* Form to set canvas dimensions */}
       {!isCanvasReady ? (
         <form onSubmit={handleCreateCanvas}>
           <label>
@@ -144,24 +137,17 @@ const CanvasAppWithUserDimensionsAndZoom = () => {
             />
           </label>
 
-          {/* Zoom controls */}
           <div style={{ marginBottom: "10px" }}>
-            <button onClick={() => handleZoom(-0.1)}>Zoom Out</button>
-            <button onClick={() => handleZoom(0.1)}>Zoom In</button>
-            <span>Zoom: {Math.round(scale * 100)}%</span>
+            <button onClick={handleAddRectangle}>Add Rectangle</button>
+            <input
+              type="file"
+              accept="image/*"
+              ref={fileInputRef}
+              style={{ marginLeft: "10px" }}
+              onChange={handleImageUpload}
+            />
           </div>
 
-          {/* Image upload input */}
-          <input
-            type="file"
-            accept="image/*"
-            ref={fileInputRef}
-            style={{ marginBottom: "10px" }}
-            multiple
-            onChange={handleImageUpload}
-          />
-
-          {/* Konva Stage */}
           <div
             style={{
               overflow: "auto",
@@ -177,40 +163,36 @@ const CanvasAppWithUserDimensionsAndZoom = () => {
               height={dimensions.height}
               scaleX={scale}
               scaleY={scale}
-              visible={true}
-              style={{backgroundColor: "yellow", border: "1px solid red"}}
             >
               <Layer>
-                {images.map((img) => (
-                  <Image
-                    key={img.id}
-                    image={img.image}
-                    x={img.x}
-                    y={img.y}
-                    scaleX={img.scaleX}
-                    scaleY={img.scaleY}
+                {rectangles.map((rect) => (
+                  <Group
+                    key={rect.id}
+                    x={rect.x}
+                    y={rect.y}
                     draggable
-                    onClick={() => attachTransformer(img.id)}
-                    onTap={() => attachTransformer(img.id)}
-                    onTransformEnd={() => handleTransformEnd(img.id)}
-                    ref={(node) => (img.imageRef = node)}
-                    visible={true}
-                  />
+                    onClick={() => handleSelectRectangle(rect.id)}
+                    onTransformEnd={(e) => handleRectangleTransformEnd(rect.id, e)}
+                  >
+                    <Rect
+                      width={rect.width}
+                      height={rect.height}
+                      fill={rect.fill}
+                      stroke={rect.id === selectedRectangleId ? "red" : "black"}
+                      strokeWidth={2}
+                    />
+                    {rect.image && (
+                      <Image
+                        image={rect.image}
+                        width={rect.width}
+                        height={rect.height}
+                      />
+                    )}
+                  </Group>
                 ))}
                 <Transformer ref={transformerRef} />
               </Layer>
             </Stage>
-          </div>
-
-          {/* Display image list for removal */}
-          <div>
-            <h4>Uploaded Images</h4>
-            {images.map((img) => (
-              <div key={img.id} style={{ marginBottom: "10px" }}>
-                <span>{img.id}</span>
-                <button onClick={() => handleRemoveImage(img.id)}>Remove</button>
-              </div>
-            ))}
           </div>
         </div>
       )}

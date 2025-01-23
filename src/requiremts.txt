@@ -1,0 +1,11 @@
+
+Create a canvas with user-defined dimensions
+Allow users to upload images to the canvas
+Allow users to resize the images
+need to hide the scrollbars
+neeed to adjust the dimension of the canvas to fit the container even when the user-defined dimensions exceed the fixed container size
+provide option to drag and drop the shapes for now only rectangle shape
+provide option the upload the image inside the rectangle shape
+provide option to resize the image inside the rectangle shape  
+image can only able to upload inside the shapes not the canvas
+need to provide different shapes for the user to drag and drop the shapes inside the canvas for now show only reactangle 

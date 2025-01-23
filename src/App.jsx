@@ -1,11 +1,11 @@
 import './App.css'
-import CanvasAppWithImageUpload from './components/CanvasWithImageUpload'
+import CanvasAppWithUserDimensionsAndZoom from './components/CanvasWithImageUpload'
 
 function App() {
 
   return (
     <>
-     <CanvasAppWithImageUpload/>
+     <CanvasAppWithUserDimensionsAndZoom/>
     </>
   )
 }
